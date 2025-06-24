@@ -19,8 +19,7 @@ func Init() {
 		log.Fatal("❌ Failed to connect to DB:", err)
 	}
 
-	// 💥 ВАЖНО: создание таблицы
-	if err := DB.AutoMigrate(&models.User{}); err != nil {
+	if err := DB.AutoMigrate(&models.User{}, &models.Test{}, &models.Question{}); err != nil {
 		log.Fatal("❌ Failed to migrate User:", err)
 	}
 
