@@ -14,6 +14,19 @@ type CreateTestInput struct {
 	Description string `json:"description"`
 }
 
+type CreateQuestionInput struct {
+	Text    string `json:"text" binding:"required"`
+	OptionA string `json:"optionA" binding:"required"`
+	OptionB string `json:"optionB" binding:"required"`
+	OptionC string `json:"optionC" binding:"required"`
+	OptionD string `json:"optionD" binding:"required"`
+	Answer  string `json:"answer" binding:"required,oneof=A B C D"`
+}
+
+type SubmitAnswersInput struct {
+	Answers map[string]string `json:"answers" binding:"required"`
+}
+
 func CreateTest(c *gin.Context) {
 	var input CreateTestInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -34,15 +47,6 @@ func CreateTest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Test created", "test": test})
-}
-
-type CreateQuestionInput struct {
-	Text    string `json:"text" binding:"required"`
-	OptionA string `json:"optionA" binding:"required"`
-	OptionB string `json:"optionB" binding:"required"`
-	OptionC string `json:"optionC" binding:"required"`
-	OptionD string `json:"optionD" binding:"required"`
-	Answer  string `json:"answer" binding:"required,oneof=A B C D"`
 }
 
 func AddQuestion(c *gin.Context) {
@@ -85,4 +89,42 @@ func GetAllTests(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"tests": tests})
+}
+
+func SubmitTest(c *gin.Context) {
+	testIDStr := c.Param("id")
+	testID, err := strconv.Atoi(testIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid test ID"})
+		return
+	}
+
+	var input SubmitAnswersInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	var questions []models.Question
+	if err := db.DB.Where("test_id = ?", testID).Find(&questions).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch questions"})
+		return
+	}
+
+	total := len(questions)
+	score := 0
+	correctAnswers := make(map[string]string)
+
+	for _, q := range questions {
+		correctAnswers[strconv.Itoa(int(q.ID))] = q.Answer
+		if ans, ok := input.Answers[strconv.Itoa(int(q.ID))]; ok && ans == q.Answer {
+			score++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"score":           score,
+		"total":           total,
+		"correct_answers": correctAnswers,
+	})
 }

@@ -29,6 +29,6 @@ func SetupRouter() *gin.Engine {
 	admin.GET("/dashboard", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "Hello, Admin!"})
 	})
-
+	protected.POST("/tests/:id/submit", quiz.SubmitTest)
 	return r
 }
