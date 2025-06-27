@@ -3,6 +3,7 @@ package quiz
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"techtestify/internal/db"
@@ -122,9 +123,80 @@ func SubmitTest(c *gin.Context) {
 		}
 	}
 
+	userID := c.GetUint("user_id")
+	result := models.Result{
+		UserID:  userID,
+		TestID:  uint(testID),
+		Score:   score,
+		Total:   total,
+		Created: time.Now(),
+	}
+
+	if err := db.DB.Create(&result).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save result"})
+		return
+	}
+
+	percentage := float64(score) / float64(total) * 100
 	c.JSON(http.StatusOK, gin.H{
 		"score":           score,
 		"total":           total,
+		"percentage":      percentage,
 		"correct_answers": correctAnswers,
 	})
+}
+
+func GetUserResults(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var results []models.Result
+
+	if err := db.DB.Where("user_id = ?", userID).Preload("Test").Order("created desc").Find(&results).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch results"})
+		return
+	}
+
+	var response []gin.H
+	for _, res := range results {
+		percentage := float64(res.Score) / float64(res.Total) * 100
+		response = append(response, gin.H{
+			"test_id":    res.TestID,
+			"test_title": res.Test.Title,
+			"score":      res.Score,
+			"total":      res.Total,
+			"percentage": percentage,
+			"created":    res.Created,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"results": response})
+}
+
+func GetResultsByTest(c *gin.Context) {
+	testIDStr := c.Param("id")
+	testID, err := strconv.Atoi(testIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid test ID"})
+		return
+	}
+
+	var results []models.Result
+	if err := db.DB.Where("test_id = ?", testID).Preload("User").Order("created desc").Find(&results).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch test results"})
+		return
+	}
+
+	var response []gin.H
+	for _, res := range results {
+		percentage := float64(res.Score) / float64(res.Total) * 100
+		response = append(response, gin.H{
+			"user_id":    res.UserID,
+			"email":      res.User.Email,
+			"score":      res.Score,
+			"total":      res.Total,
+			"percentage": percentage,
+			"created":    res.Created,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"results": response})
 }

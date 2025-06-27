@@ -18,8 +18,9 @@ func Init() {
 	if err != nil {
 		log.Fatal("❌ Failed to connect to DB:", err)
 	}
-
-	if err := DB.AutoMigrate(&models.User{}, &models.Test{}, &models.Question{}); err != nil {
+	
+	DB.Exec("DELETE FROM results")
+	if err := DB.AutoMigrate(&models.User{}, &models.Test{}, &models.Question{}, &models.Result{}); err != nil {
 		log.Fatal("❌ Failed to migrate User:", err)
 	}
 
